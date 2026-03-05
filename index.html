@@ -18,10 +18,20 @@
     
     <!-- Stylesheets -->
     <link rel="stylesheet" href="css/style.css">
+    <link rel="stylesheet" href="css/tags.css">
 </head>
 <body>
     <div id="app">
         <header>
+            <div class="header-left">
+                <button id="hamburgerBtn" class="hamburger-btn" aria-label="Open navigation">
+                    <span></span><span></span><span></span>
+                </button>
+                <div id="navDropdown" class="nav-dropdown" style="display: none;">
+                    <a href="#menu" class="nav-link" onclick="closeNav()">Menu</a>
+                    <a href="#tags" class="nav-link" onclick="closeNav()">Tags</a>
+                </div>
+            </div>
             <h1>Double J Menu</h1>
             <nav>
                 <button id="installBtn" class="install-button" style="display: none;">Install App</button>
@@ -29,45 +39,68 @@
         </header>
         
         <main>
-            <section class="hero">
-                <h2>Welcome to Double J Menu</h2>
-                <p>🩵 a product of love 🩵</p>
-            </section>
-            
-            <!-- Add Item Form -->
-            <section class="add-item-section">
-                <button id="toggleFormBtn" class="toggle-form-btn">+ Add New Item</button>
-                
-                <form id="addItemForm" class="add-item-form" style="display: none;">
-                    <h3>Add Menu Item</h3>
-                    <div class="form-group">
-                        <label for="itemName">Item Name *</label>
-                        <input type="text" id="itemName" required placeholder="e.g., Caesar Salad">
+            <!-- Menu page -->
+            <div id="page-menu" class="page">
+                <section class="hero">
+                    <h2>Welcome to Double J Menu</h2>
+                    <p>🩵 a product of love 🩵</p>
+                </section>
+
+                <section class="add-item-section">
+                    <button id="toggleFormBtn" class="toggle-form-btn">+ Add New Item</button>
+
+                    <form id="addItemForm" class="add-item-form" style="display: none;">
+                        <h3 id="formTitle">Add Menu Item</h3>
+                        <input type="hidden" id="editingItemId" value="">
+                        <div class="form-group">
+                            <label for="itemName">Item Name *</label>
+                            <input type="text" id="itemName" required placeholder="e.g., Caesar Salad">
+                        </div>
+                        <div class="form-group">
+                            <label for="itemDescription">Description</label>
+                            <textarea id="itemDescription" rows="3" placeholder="Brief description of the item"></textarea>
+                        </div>
+                        <div class="form-group">
+                            <label for="itemTag">Tags/Categories *</label>
+                            <div class="tag-input-container">
+                                <input type="text" id="itemTag" placeholder="e.g., Appetizer, Main Course" list="tagSuggestions">
+                                <button type="button" id="addTagBtn" class="add-tag-btn">+ Add Tag</button>
+                            </div>
+                            <datalist id="tagSuggestions">
+                                <!-- Previously used tags will be populated here -->
+                            </datalist>
+                            <div id="selectedTags" class="selected-tags"></div>
+                            <div id="existingTags" class="existing-tags"></div>
+                        </div>
+                        <div class="form-actions">
+                            <button type="submit" class="btn-submit" id="submitBtn">Add Item</button>
+                            <button type="button" id="cancelBtn" class="btn-cancel">Cancel</button>
+                        </div>
+                    </form>
+                </section>
+
+                <div class="menu-container">
+                    <div id="menuItems">
+                        <!-- Menu items will be loaded here -->
                     </div>
-                    <div class="form-group">
-                        <label for="itemDescription">Description</label>
-                        <textarea id="itemDescription" rows="3" placeholder="Brief description of the item"></textarea>
-                    </div>
-                    <div class="form-group">
-                        <label for="itemTag">Tag/Category *</label>
-                        <input type="text" id="itemTag" required placeholder="e.g., Appetizer, Main Course, Dessert" list="tagSuggestions">
-                        <datalist id="tagSuggestions">
-                            <!-- Previously used tags will be populated here -->
-                        </datalist>
-                        <div id="existingTags" class="existing-tags"></div>
-                    </div>
-                    <div class="form-actions">
-                        <button type="submit" class="btn-submit">Add Item</button>
-                        <button type="button" id="cancelBtn" class="btn-cancel">Cancel</button>
-                    </div>
-                </form>
-            </section>
-            
-            <section class="menu-container">
-                <div id="menuItems">
-                    <!-- Menu items will be loaded here -->
                 </div>
-            </section>
+            </div>
+
+            <!-- Tags page -->
+            <div id="page-tags" class="page" style="display: none;">
+                <!-- Tags list view -->
+                <div id="tagsListView">
+                    <div id="tagsPanel" class="tags-panel">
+                        <!-- Tags will be loaded here -->
+                    </div>
+                </div>
+                <!-- Tag items view -->
+                <div id="tagItemsView" style="display: none;">
+                    <button class="back-btn" onclick="showTagsList()">&#8592; Back to Tags</button>
+                    <h2 id="tagItemsTitle" class="tag-items-heading"></h2>
+                    <div id="tagItemsList" class="tag-items-list"></div>
+                </div>
+            </div>
         </main>
         
         <footer>

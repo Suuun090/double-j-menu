@@ -2,7 +2,7 @@
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {
     navigator.serviceWorker
-      .register('/service-worker.js')
+      .register('service-worker.js')
       .then((registration) => {
         console.log('Service Worker registered successfully:', registration.scope);
       })
@@ -17,14 +17,33 @@ document.addEventListener('DOMContentLoaded', () => {
   console.log('Double J Menu app loaded');
   loadMenuItems();
   initializeForm();
+  initialiseHamburger();
+  initialiseRouter();
   subscribeToRealtimeUpdates();
 });
+
+// Router
+function initialiseRouter() {
+  function navigate() {
+    const page = window.location.hash === '#tags' ? 'tags' : 'menu';
+    document.getElementById('page-menu').style.display = page === 'menu' ? 'block' : 'none';
+    document.getElementById('page-tags').style.display = page === 'tags' ? 'block' : 'none';
+    if (page === 'tags') loadTagsPanel();
+  }
+  window.addEventListener('hashchange', navigate);
+  navigate();
+}
 
 // Initialize form handlers
 function initializeForm() {
   const toggleFormBtn = document.getElementById('toggleFormBtn');
   const addItemForm = document.getElementById('addItemForm');
   const cancelBtn = document.getElementById('cancelBtn');
+  const addTagBtn = document.getElementById('addTagBtn');
+  const itemTagInput = document.getElementById('itemTag');
+  
+  // Store selected tags
+  window.selectedTags = [];
   
   toggleFormBtn.addEventListener('click', async () => {
     const isHidden = addItemForm.style.display === 'none';
@@ -41,19 +60,145 @@ function initializeForm() {
     addItemForm.style.display = 'none';
     toggleFormBtn.textContent = '+ Add New Item';
     addItemForm.reset();
+    window.selectedTags = [];
+    updateSelectedTagsDisplay();
+    document.getElementById('editingItemId').value = '';
+    document.getElementById('formTitle').textContent = 'Add Menu Item';
+    document.getElementById('submitBtn').textContent = 'Add Item';
+  });
+  
+  addTagBtn.addEventListener('click', () => {
+    addTag();
+  });
+  
+  itemTagInput.addEventListener('keypress', (e) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      addTag();
+    }
   });
   
   addItemForm.addEventListener('submit', (e) => {
+    console.log('Form submit event triggered!');
     e.preventDefault();
+    console.log('Default prevented, calling addMenuItem()');
     addMenuItem();
   });
+}
+
+// Add a tag to the selected tags
+function addTag() {
+  const tagInput = document.getElementById('itemTag');
+  const tag = tagInput.value.trim();
+  
+  if (tag && !window.selectedTags.includes(tag)) {
+    window.selectedTags.push(tag);
+    updateSelectedTagsDisplay();
+    tagInput.value = '';
+  }
+}
+
+// Initialise hamburger navigation
+function initialiseHamburger() {
+  const btn = document.getElementById('hamburgerBtn');
+  const dropdown = document.getElementById('navDropdown');
+
+  btn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    const isOpen = dropdown.style.display === 'block';
+    dropdown.style.display = isOpen ? 'none' : 'block';
+  });
+
+  document.addEventListener('click', () => {
+    dropdown.style.display = 'none';
+  });
+}
+
+function closeNav() {
+  document.getElementById('navDropdown').style.display = 'none';
+}
+
+// Load and render the tags panel
+async function loadTagsPanel() {
+  const panel = document.getElementById('tagsPanel');
+  panel.innerHTML = '<p class="tags-panel-empty">Loading...</p>';
+
+  try {
+    window.allMenuItems = await db.getMenuItems();
+    renderTagsPanel(window.allMenuItems);
+  } catch (error) {
+    console.error('Error loading tags panel:', error);
+    panel.innerHTML = '<p class="tags-panel-empty">Failed to load tags.</p>';
+  }
+}
+
+function renderTagsPanel(items) {
+  const panel = document.getElementById('tagsPanel');
+  const tally = {};
+  items.forEach(item => {
+    (item.tags || []).forEach(tag => {
+      tally[tag] = (tally[tag] || 0) + 1;
+    });
+  });
+
+  const tags = Object.keys(tally).sort();
+  if (tags.length === 0) {
+    panel.innerHTML = '<p class="tags-panel-empty">No tags added yet.</p>';
+    return;
+  }
+
+  const tagBar = tags.map(tag => `
+    <button class="tag-card" onclick="selectTagFilter('${escapeHtml(tag)}')">
+      ${escapeHtml(tag)}
+      <span class="tag-card-count">${tally[tag]}</span>
+    </button>`).join('');
+
+  panel.innerHTML = `<div class="tag-bar">${tagBar}</div>`;
+}
+
+function selectTagFilter(tag) {
+  const filtered = window.allMenuItems.filter(item => (item.tags || []).includes(tag));
+  document.getElementById('tagItemsTitle').textContent = tag;
+  document.getElementById('tagItemsList').innerHTML = filtered.map(item => `
+    <div class="tag-item-row">
+      <strong>${escapeHtml(item.name)}</strong>
+      ${item.description ? `<span class="tag-item-desc">${escapeHtml(item.description)}</span>` : ''}
+    </div>`).join('');
+  document.getElementById('tagsListView').style.display = 'none';
+  document.getElementById('tagItemsView').style.display = 'block';
+}
+
+function showTagsList() {
+  document.getElementById('tagItemsView').style.display = 'none';
+  document.getElementById('tagsListView').style.display = 'block';
+}
+
+// Remove a tag from selected tags
+function removeTag(tag) {
+  window.selectedTags = window.selectedTags.filter(t => t !== tag);
+  updateSelectedTagsDisplay();
+}
+
+// Update the display of selected tags
+function updateSelectedTagsDisplay() {
+  const container = document.getElementById('selectedTags');
+  if (window.selectedTags.length === 0) {
+    container.innerHTML = '';
+    return;
+  }
+  
+  container.innerHTML = window.selectedTags
+    .map(tag => `<span class="selected-tag">${escapeHtml(tag)} <button type="button" onclick="removeTag('${escapeHtml(tag)}')">×</button></span>`)
+    .join('');
 }
 
 // Load existing tags from database
 async function loadExistingTags() {
   try {
     const menuItems = await db.getMenuItems();
-    const tags = [...new Set(menuItems.map(item => item.tag).filter(tag => tag))];
+    // Get all unique tags from all items
+    const allTags = menuItems.flatMap(item => item.tags || []);
+    const tags = [...new Set(allTags)].filter(tag => tag);
     
     // Update datalist
     const datalist = document.getElementById('tagSuggestions');
@@ -63,7 +208,7 @@ async function loadExistingTags() {
     const existingTagsDiv = document.getElementById('existingTags');
     if (tags.length > 0) {
       existingTagsDiv.innerHTML = '<small>Quick select:</small> ' + 
-        tags.map(tag => `<button type="button" class="tag-button" onclick="selectTag('${escapeHtml(tag)}')">${escapeHtml(tag)}</button>`).join('');
+        tags.map(tag => `<button type="button" class="tag-button" onclick="quickAddTag('${escapeHtml(tag)}')">${escapeHtml(tag)}</button>`).join('');
     } else {
       existingTagsDiv.innerHTML = '<small>No tags yet. Create your first one!</small>';
     }
@@ -72,9 +217,12 @@ async function loadExistingTags() {
   }
 }
 
-// Select a tag from suggestions
-function selectTag(tag) {
-  document.getElementById('itemTag').value = tag;
+// Quick add a tag from suggestions
+function quickAddTag(tag) {
+  if (!window.selectedTags.includes(tag)) {
+    window.selectedTags.push(tag);
+    updateSelectedTagsDisplay();
+  }
 }
 
 // Load menu items from Supabase
@@ -123,40 +271,98 @@ function subscribeToRealtimeUpdates() {
   });
 }
 
-// Add new menu item
+// Add or update menu item
 async function addMenuItem() {
   const name = document.getElementById('itemName').value.trim();
   const description = document.getElementById('itemDescription').value.trim();
-  const tag = document.getElementById('itemTag').value.trim();
+  const editingItemId = document.getElementById('editingItemId').value;
   
-  if (!name || !tag) {
-    alert('Please fill in all required fields');
+  console.log('Form submitted:', { name, description, tags: window.selectedTags, editingItemId });
+  
+  if (!name || window.selectedTags.length === 0) {
+    alert('Please fill in all required fields and add at least one tag');
     return;
   }
   
-  const newItem = {
+  const itemData = {
     name: name,
     description: description,
-    tag: tag
+    tags: window.selectedTags
   };
   
+  console.log('Item data:', itemData);
+  
   try {
-    // Add to Supabase
-    await db.addMenuItem(newItem);
+    if (editingItemId) {
+      // Update existing item
+      console.log('Updating item ID:', editingItemId);
+      await db.updateMenuItem(parseInt(editingItemId), itemData);
+      showNotification('Item updated successfully!', 'success');
+    } else {
+      // Add new item
+      console.log('Adding new item');
+      await db.addMenuItem(itemData);
+      showNotification('Item added successfully!', 'success');
+    }
     
     // Reset form
     document.getElementById('addItemForm').reset();
     document.getElementById('addItemForm').style.display = 'none';
     document.getElementById('toggleFormBtn').textContent = '+ Add New Item';
+    document.getElementById('editingItemId').value = '';
+    document.getElementById('formTitle').textContent = 'Add Menu Item';
+    document.getElementById('submitBtn').textContent = 'Add Item';
+    window.selectedTags = [];
+    updateSelectedTagsDisplay();
     
     // Reload items
+    console.log('Reloading menu items...');
     await loadMenuItems();
-    
-    // Show success message
-    showNotification('Item added successfully!', 'success');
   } catch (error) {
-    console.error('Error adding item:', error);
-    showNotification('Failed to add item. Please try again.', 'error');
+    console.error('Error saving item:', error);
+    showNotification('Failed to save item. Please try again.', 'error');
+  }
+}
+
+// Edit menu item
+async function editMenuItem(id) {
+  try {
+    console.log('Editing item with ID:', id);
+    const items = await db.getMenuItems();
+    const item = items.find(i => i.id === id);
+    
+    console.log('Found item:', item);
+    
+    if (!item) {
+      showNotification('Item not found', 'error');
+      return;
+    }
+    
+    // Populate form with item data
+    document.getElementById('itemName').value = item.name;
+    document.getElementById('itemDescription').value = item.description || '';
+    document.getElementById('editingItemId').value = id;
+    
+    // Populate tags
+    window.selectedTags = item.tags || [];
+    updateSelectedTagsDisplay();
+    
+    console.log('Form populated with tags:', item.tags);
+    
+    // Update form UI
+    document.getElementById('formTitle').textContent = 'Edit Menu Item';
+    document.getElementById('submitBtn').textContent = 'Update Item';
+    document.getElementById('addItemForm').style.display = 'block';
+    document.getElementById('toggleFormBtn').textContent = '− Close Form';
+    
+    // Load existing tags
+    await loadExistingTags();
+    
+    // Scroll to form
+    document.getElementById('addItemForm').scrollIntoView({ behavior: 'smooth' });
+  } catch (error) {
+    console.error('Error loading item for edit:', error);
+    showNotification('Failed to load item. Please try again.', 'error');
   }
 }
 
@@ -180,15 +386,33 @@ async function deleteMenuItem(id) {
 function createMenuItem(item) {
   const div = document.createElement('div');
   div.className = 'menu-item';
+  const tags = item.tags && item.tags.length > 0
+    ? item.tags.map(tag => `<span class="item-tag">${escapeHtml(tag)}</span>`).join('')
+    : '';
+  const hasDescription = item.description && item.description.trim();
+
   div.innerHTML = `
     <div class="menu-item-content">
-      ${item.tag ? `<span class="item-tag">${escapeHtml(item.tag)}</span>` : ''}
-      <h3>${escapeHtml(item.name)}</h3>
-      <p>${escapeHtml(item.description)}</p>
+      ${tags}
+      <div class="item-name-row">
+        <h3>${escapeHtml(item.name)}</h3>
+        ${hasDescription ? `<button class="expand-btn" onclick="toggleDescription(this)" title="Show description">▸</button>` : ''}
+      </div>
+      ${hasDescription ? `<p class="item-description collapsed">${escapeHtml(item.description)}</p>` : ''}
     </div>
-    <button class="delete-btn" onclick="deleteMenuItem(${item.id})" title="Delete item">×</button>
+    <div class="item-actions">
+      <button class="edit-btn" onclick="editMenuItem(${item.id})" title="Edit item">✎</button>
+      <button class="delete-btn" onclick="deleteMenuItem(${item.id})" title="Delete item">×</button>
+    </div>
   `;
   return div;
+}
+
+// Toggle description visibility
+function toggleDescription(btn) {
+  const desc = btn.closest('.menu-item-content').querySelector('.item-description');
+  const isCollapsed = desc.classList.toggle('collapsed');
+  btn.textContent = isCollapsed ? '▸' : '▾';
 }
 
 // Escape HTML to prevent XSS

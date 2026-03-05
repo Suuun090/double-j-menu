@@ -42,7 +42,7 @@ const db = {
         .insert([{
           name: item.name,
           description: item.description,
-          tag: item.tag
+          tags: item.tags
         }])
         .select();
       
@@ -50,6 +50,32 @@ const db = {
       return data[0];
     } catch (error) {
       console.error('Error adding menu item:', error);
+      throw error;
+    }
+  },
+
+  // Update menu item
+  async updateMenuItem(id, item) {
+    try {
+      console.log('Updating menu item in Supabase:', id, item);
+      const { data, error } = await supabaseClient
+        .from('menu_items')
+        .update({
+          name: item.name,
+          description: item.description,
+          tags: item.tags
+        })
+        .eq('id', id)
+        .select();
+      
+      if (error) {
+        console.error('Supabase update error:', error);
+        throw error;
+      }
+      console.log('Update successful:', data);
+      return data[0];
+    } catch (error) {
+      console.error('Error updating menu item:', error);
       throw error;
     }
   },
